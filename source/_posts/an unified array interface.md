@@ -31,9 +31,9 @@ Are represented as:
 +----+--------+---+---+    +-------------+------+
 | info-table* | * | * +--->+ info-table* | 'a'# |
 +-------------+-+-+---+    +-------------+------+
- This is Foo   |           This is C# (Char's constructor)
-               V
-            +--+----------+----+
+ This is Foo    |          This is C# (Char's constructor)
+                V
+            +---+---------+----+
             | info-table* | 3# |
             +-------------+----+
              This is I# (Int's constructor)
@@ -69,7 +69,7 @@ Now let's consider GHC arrays, they're special heap objects provided by RTS. We 
 +-------------+--------------+---------------------------+---+-...-+---+---+------------+
 | info-table* | payload size | payload + card-table size | * | ... | * | * | card table |
 +-------------+--------------+---------------------------+-+-+-...-+---+---+------------+
- MutableArray#                                          |
+ MutableArray#                                             |
                                                            V
                                                     +------+------+-----+
                                                     | info-table* | ... |                                                        
