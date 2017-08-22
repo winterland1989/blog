@@ -24,6 +24,6 @@ date: 2017-08-18 12:40:48
 
 ## 出版物 / Published
 
-我于2016年下半年出版的 Haskell 教程，欢迎[购买](http://search.jd.com/Search?keyword=%E9%AD%94%E5%8A%9Bhaskell&amp;enc=utf-8).
+我于2016年下半年出版的 Haskell 教程，欢迎[购买](http://search.jd.com/Search?keyword=%E9%AD%94%E5%8A%9Bhaskell&amp;enc=utf-8)。
 
 {% img http://magic-haskell.com/cover.png 240 魔力Haskell %}
