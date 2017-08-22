@@ -1,0 +1,3 @@
+[submodule "themes/winterland"]
+	path = themes/winterland
+	url = git@github.com:winterland1989/hexo-theme-winterland.git
