@@ -2,3 +2,10 @@ title: Winter's Land
 subtitle: 有朋自远方来，不亦乐乎
 theme: winterland
 author: winter
+
+
+deploy:
+  type: git
+  repo: git@github.com:winterland1989/winterland1989.github.io.git
+  branch: master
+  message:
