@@ -2,7 +2,8 @@ title: Winter's Land
 subtitle: 有朋自远方来，不亦乐乎
 theme: winterland
 author: winter
-
+url: http://winterland.me
+root: /
 
 deploy:
   type: git
