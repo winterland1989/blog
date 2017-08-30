@@ -1,11 +1,13 @@
 ---
-title: Haskell中的惰性求值和指针标记优化
+title: Inside GHC: 惰性求值和指针标记优化
 date: 2017/8/25 10:54
 tags: haskell
 ---
 
 一个常常被问起的 Haskell 问题是：[Haskell中的惰性求值如何实现？](https://www.zhihu.com/question/23849854)，真正解答这个问题除了需要《计算机原理》这门课不挂科之外，还需要按照 Haskell 的社区传统，去阅读若干篇 paper（见文章底部引用）。这篇文章尝试对 Haskell 的主流实现，GHC 的惰性求值做一个总结，并附带介绍 GHC 实现的一种优化:指针标记（pointer tagging），来帮助读者对惰性求值的 cost model
-有一个更好的判断。文章主要内容来自上述论文和 [GHC Commentary](https://ghc.haskell.org/trac/ghc/wiki/Commentary)，建议感兴趣的读者前去探索 。
+有一个更好的判断。
+
+<!-- more --> 
 
 ## 什么是惰性求值？
 
@@ -67,3 +69,21 @@ data Int = I# Char#
 + `FUN`, `FUN_STATIC`，动态/静态创建的函数，例如 `\x y -> x + y`。
 
 + `THUNK`, `THUNK_STATIC`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 参考
+
++ [GHC Commentary](https://ghc.haskell.org/trac/ghc/wiki/Commentary)

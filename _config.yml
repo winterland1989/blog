@@ -5,8 +5,14 @@ author: winter
 url: http://winterland.me
 root: /
 
+per_page: 10
+
+archive_generator:
+  per_page: 0
+
 deploy:
   type: git
   repo: git@github.com:winterland1989/winterland1989.github.io.git
   branch: master
   message:
+
