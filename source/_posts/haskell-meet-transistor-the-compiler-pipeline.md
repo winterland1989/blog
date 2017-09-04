@@ -1,5 +1,5 @@
 ---
-title: "Haskell Meet Transitor: STG machine"
+title: "Haskell Meet Transitor: The compiler pipeline"
 date: 2017/8/25 10:54
 tags: haskell
 ---
@@ -10,8 +10,10 @@ tags: haskell
 
 ##  编译过程
 
+了解编译过程对于掌握 Haskell 程序的运行时表现至关重要，尤其是像 GHC 这样会对
 
-GHC 对 Haskell 的[编译过程](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/HscMain)主要包括以下几个阶段：
+对 Haskell 的[编译过程](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/HscMain) 较为复杂，
+主要包括以下几个阶段：
 
 + 解析（parse）、重命名（rename）、类型检查（type checker）
 
@@ -66,9 +68,6 @@ bar showdict x = ... (show showdict) x ...
 -- | 在调用方把正确的词典传递给多态方法
 bar showFooInstance foo
 ```
-
-
-
 
 + 脱糖（Desugar）
 
