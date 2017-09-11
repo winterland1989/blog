@@ -1,5 +1,5 @@
 ---
-title: "Haskell Meet Transitor: The compiler pipeline"
+title: "Haskell Meet Transitor: 了解 STG"
 date: 2017/8/25 10:54
 tags: haskell
 ---
