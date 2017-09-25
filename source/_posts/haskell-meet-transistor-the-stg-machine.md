@@ -4,13 +4,181 @@ date: 2017/8/25 10:54
 tags: haskell
 ---
 
-很多 Haskeller 无法一眼看穿自己的代码调度计算机的过程，而这种情况很少发生在 C 或者是 Java 程序员身上，常常一个普通的 JavaScript 程序员也可以和你聊聊 Google V8 的各种优化是如何实现的。这种情况和 Haskell 本身的高度抽象当然密不可分，不过更多的原因，在于 Haskell 的执行模型和大多数过程式编程语言的区别，作为 Haskell Meet Transitor 系列文章的开篇，我们先来聊聊 Haskell 的主力实现 GHC， 是如何编译 Haskell 程序的。
+    To tag or not to tag: that is the question:
+    Whether 'tis faster in the cache to suffer
+    The delays of tagless nodes,
+    Or break the pipe no more
+    And make a branch that hits the cache.
+    To load, to jump;
+    To jump: perchance to stall; Ay, there's the run.
+                    
+                                                -- Kevin Hammond
 
-<!-- more --> 
+<!-- more -->
+
+## STG 是什么？
+
+STG 是一门迷你的函数式编程语言，以及配套的自动机设计。它的主要设计目的是把 Haskell 的程序变成可以在现有的硬件架构（冯·诺依曼）上运行的机器码，在整个 GHC 编译流程中的位置大约如下图：
+
+```
+Haskell ====> Core ====> STG ====> Cmm ====> Code
+```
+
+作为 GHC 使用的一个中间语言，他并没有提供可以直接用于书写的语法，但是提供了简单的打印功能。你可以通过向 `ghc` 传递 `-ddump-stg` 参数来观察一个 haskell 程序对应的 STG 程序表示。
+
+作为一门函数式编程语言，STG 支持下几种简单的语法结构：
+
++ 数据构造 constructor
++ 数据解构 case
++ 数据字面量 literal
++ 原始操作/FFI primitives
++ 匿名函数 lambda
++ 函数应用 application
++ Let绑定 let
+
+同时作为一个自动机体系，STG 提供了上述语法结构的执行模型，即生成 Cmm 代码的规则（Cmm 是 GHC 使用的一层汇编抽象层以屏蔽不同机器架构的区别）。
+
+虽说 STG 是一门编译器的中间语言，但是它的抽象程度其实相对来说已经相当的高了。例如它支持自由变量，即其他编程语言里闭包的概念；他还支持函数的自动柯里化，通过参数数量分析自动生成对应的调用代码。这些都是很多传统的过程式编程语言所不支持的。
+
+值得强调的是，STG 的程序是一个巨大嵌套的表达式，而不像过程式编程语言的程序那样，按照语句顺序编译可以直接得到一个巨大的指令列表。事实上 STG 的一个目标就是把这个巨大的表达式转换成一个按步骤求值的指令列表。
 
 ## STG 自动机
 
-STG 是一门面向代码生成的函数式语言，也是一个十分有趣的自动机，其设计目标是在现有的硬件架构（冯·诺依曼）上高效地求值 STG 表达式，它包含：
+STG 自动机是一套把 STG 程序转换成底层顺序执行代码的规则，概念上来说，它包含：
+
++ STG 寄存器，其中重要的有：
+    + `Hp` 堆顶寄存器，记录当前堆顶的地址。
+    + `HpLim` 堆底寄存器，记录当前最大栈地址。
+    + `Sp` 栈顶寄存器，记录当前栈顶的地址。
+    + `SpLim` 栈底寄存器，记录当前最小栈地址。
+    + `R1..R10, F1..F4, D1..D4, L1..L2` 临时结果寄存器，用于传递参数、结果。
+
++ STG 栈，地址向下增加。
+
++ STG 堆，地址向上增加。
+
+STG 里的虚拟寄存器会在被尽量分配到真实寄存器上以提高性能，如果
+
+这些 STG 寄存器的硬件架构约定在[MachRegs.h](https://github.com/ghc/ghc/blob/master/includes/stg/MachRegs.h)里。
+
+
+STG 的运行就是通过不停地对 STG 表达式求值实现的，所以 STG 程序的单元是 *表达式*（expression）而非 *语句*（statement）。其实在传统的编译体系，例如 C 语言里，也存在 *函数* 的概念，这个概念其实包含了代码生成过程中的几个要点：
+
++ 函数体里的代码里如何找到函数的参数？
+
++ 如何控制硬件进入函数执行？
+
++ 函数体里的临时变量存放在哪里，怎样保证函数结束之后得到正确的清理？
+
++ 函数体的返回值放在哪里？
+
+对上述问题的答案也被称作行时的调用约定（calling convention）。对于 STG 来说，除了一些可以直接通过机器指令实现的函数之外，其他情况下和 C 差不多，例如参数一般都在栈上，如果处理器的寄存器比较富裕的话也会通过寄存器来传递参数等等。另外 STG 函数还需要一些扩展功能：支持自由变量和柯里化。即 STG 除了要定义上述问题的答案之外，还需要额外定义如下问题的答案：
+
++ 函数体里的代码如何找到函数的自由变量，也就是通过词法作用域引入而非参数传递的绑定。
+
++ 函数期待的参数数目（arity）是多少，如果调用的时候提供的参数数量小于或者大于期待的数目，应该如何处理？
+
+STG 的设计还需要考虑到运行时的其他组件，例如垃圾回收器（GC）和多线程调度器（scheduler）。这就需要通过一些约定来保证彼此的正常工作。
+
+
+## 数据构造，数据解构
+
+大部分函数式编程语言的控制流程都建立在数据的构造和解构之上。例如下面的这个 Haskell 声明：
+
+```haskell
+data Bool = Ture | False
+```
+
+定义了一个*数据类型`Bool`*，这个类型有两个可能的*构造函数(constructor) `True`, `False`*，当我们想要知道一个`Bool`类型的值是哪一个构造函数的时候，我们使用`case`语法进行模式匹配:
+
+```haskell
+case (f x) of True  -> ....
+              False -> ...
+```
+
+这就完成了其他语言内置的`if x then a else b`逻辑控制结构，Haskell 本身也提供了 `if x then a else b` 语法，但是它不过是下面的语句的语法糖而已：
+
+```
+case x of True  -> a
+          False -> b
+```
+
+构造的过程除了可以把选择编码进去，也可以把数据集合起来，例如下面的 Haskell 声明：
+
+```haskell
+data Point = Point Double Double
+```
+
+声明了一个数据类型`Point`，以及它对应的构造函数`Point`（这两个`Point`并不冲突，前一个在类型的命名空间里，后一个不在）。当我们需要解构一个`Point`包含的成员时，我们同样使用模式匹配：
+
+```
+case (f a) of Point x y -> ...这里我们就可以使用 x 和 y 了
+```
+
+从某种角度来讲，构造函数构造数据的过程和模式匹配是两个相反的过程，对于没有内置控制结构的 Haskell 来说，这就是我们控制程序走向的基本方式。数学家们把上面的两种构造数据的过程分别叫做 *和/sum* 和 *积/product*
+
+
+
+在函数式编程里，我们非常关注构造（construction）和解构（deconstruction）的过程，例如下面的数据类型：
+
+```haskell
+`data JSON 
+    = Object (HashMap Text JSON)
+    | Array  [JSON]
+    | String Text
+    | Number Double
+    | Bool   Bool
+    | Null
+```
+
+不难看出这是一个表示 JSON 数据的类型，基于这个类型构造出来的数据，非常易于解构，例如序列化的时候：
+
+```
+case json of Object obj -> ... 递归解构 obj ... 
+             Array  arr -> ... 递归解构 arr ...
+             String str -> ... 序列化 str ...
+             ...
+```
+
+
+
+
+
+
+
+## STG 自动机
+
+STG 支撑 Haskell 在现有的硬件架构（冯·诺依曼）上运行的自动机体系，也是理解很多 Haskell 语义的关键。对于第一次接触过函数式编程语言的朋友们来说，这可能是一个奇怪的说法：Haskell 的程序是由表达式构成的一个大表达式。但是结合多年 `hello world!` 的经验，如果我告诉你，Haskell 的程序实际上是 `main` 表达式，你可能会感觉更加良好一些：
+
+```haskell
+
+main :: IO ()
+main = print "hello world!"
+```
+
+看上去和其他语言也没什么不同嘛，不过其他的语言里常常会有*语句`statement`*的概念：例如，在 C 语言里使用`;`隔开的就是语句，语句是 C 程序的基本构成单元，C 的程序运行顺序即语句的书写顺序。
+
+这一切在 Haskell 里都变了，Haskell 是一个基于 lambda 演算的语言：简单地说，就是一门建立在函数定义和函数调用之上的语言。Haskell 本身的语法尽管庞大，但在编译阶段都会通通转换成 STG，而 STG 是一门微型的函数式语言，它可以被高效的分析和运行。你可能还在疑惑，一个只有函数的语言能干些什么呢？我们不妨来了解下 STG，这门微型的语言包括几个核心的组成部分：
+
++ 字面量表达式，例如整数，浮点数，字符，数组，例如
++ 原始操作表达式，例如加减乘除，或者是操作系统提供的 I/O 函数
++ 函数定义，STG 里的函数都是匿名函数/lambda
++ Let 绑定，也就是给表达式起个名字
++ 数据构造，
++ Case 分析，
+
+  = StgApp         occ [GenStgArg occ] 
+  | StgLit         Literal
+  | StgConApp      DataCon [GenStgArg occ] [Type]        
+  | StgOpApp       StgOp [GenStgArg occ] Type            
+  | StgLam         [bndr] StgExpr  
+  | StgCase        (GenStgExpr bndr occ) bndr AltType [GenStgAlt bndr occ]
+  | StgLet         (GenStgBinding bndr occ) (GenStgExpr bndr occ)    
+  | StgLetNoEscape (GenStgBinding bndr occ) (GenStgExpr bndr occ)  
+  | StgTick (Tickish bndr) (GenStgExpr bndr occ)      
+
+
+它包含：
 
 + STG 寄存器，一组虚拟寄存器（会尽量分配到真实寄存器上）：
     + `Hp` 堆顶寄存器，记录当前堆顶的地址。
@@ -33,7 +201,7 @@ STG 是一门面向代码生成的函数式语言，也是一个十分有趣的�
 
 + 函数体的返回值放在哪里？
 
-运行时的调用约定（calling convention）就是对上述问题的解答。对于 STG 来说，除了一些可以直接通过机器指令实现的函数之外，其他情况下和 C 差不多，例如参数一般都在栈上，如果处理器的寄存器比较富裕的话也会通过寄存器来传递参数等等。另外 STG 函数还需要一些扩展功能：支持自由变量和柯里化。即 STG 除了要定义上述问题的答案之外，还需要额外定义如下问题的答案：
+对上述问题的答案也被称作行时的调用约定（calling convention）。对于 STG 来说，除了一些可以直接通过机器指令实现的函数之外，其他情况下和 C 差不多，例如参数一般都在栈上，如果处理器的寄存器比较富裕的话也会通过寄存器来传递参数等等。另外 STG 函数还需要一些扩展功能：支持自由变量和柯里化。即 STG 除了要定义上述问题的答案之外，还需要额外定义如下问题的答案：
 
 + 函数体里的代码如何找到函数的自由变量，也就是通过词法作用域引入而非参数传递的绑定。
 
