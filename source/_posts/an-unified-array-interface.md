@@ -95,7 +95,7 @@ In GHC we usually turn `MutableArray#` into a `Array#` with freeze operations af
 `MutableArray#/Array#` are unlifted because **they can't be obtained directly by thunk evaluation**, there're simply no ways to create a thunk which evaluates to `MutableArray#` or `Array#`, you can only create them using primitive operations provided by RTS, and RTS never produce them lazily(actually that may be possible, i.e. allocating array when we enter them, but doing that will complicate things).
 
 What you can do is to wrap the pointer itself inside another box, i.e. `data Array = Array Array#`, and wrap the primitive operations so that an `Array` works like all the other haskell lazy boxed types, this is actually just creating another layer indirection. Now let's say you want an array of arrays, `Array Array` is definitely not optimal: every element of the array points to a `Array` box, and inside the `Array` box we have a `Array#`
-points to the real array. The indirection is absolute wasteful if we don't need lazy on the element arrays.
+points to the real array. The indirection is absolutely wasteful if we don't need lazy on the element arrays.
 
 So here come `ArrayArray#`, It's actually just `Array#` s, but we use it to save the `Array#` pointers instead of `Array` pointers, thus save an unnecessary indirection. And we can be sure the element are all evaluated, because `Array#` are unlifted type, which can't be a thunk.
 
