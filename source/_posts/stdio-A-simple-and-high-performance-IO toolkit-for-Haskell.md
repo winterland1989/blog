@@ -9,7 +9,7 @@ Yesterday I and my friend Tao He write a short [release message](https://mail.ha
 A new `Bytes` type
 ==================
 
-`ByteString` is used as the packed bytes type for years, it's used as the buffer type in IO, serialization, parsing, etc. Because it uses pinned memory, thus allow everything works on `Ptr ()`s works on it. But this is really not ideal: pinned memory is only suitable for large blocks, if lots of small `ByteString`s are created during runtime, memory fragmentation may happen. And due to historic reason, `ByteString` choose to use `ForeignPtr` which contain a sum type, which is harder to unpack. To address these problems, in stdio we do a couple of things: 
+`ByteString` is used as the packed bytes type for years, it's used as the buffer type in IO, serialization, parsing, etc. Because it uses pinned memory, thus allow everything works on `Ptr ()`s works on it. But this is really not ideal: pinned memory is only suitable for large blocks, if lots of small `ByteString`s are created during runtime, memory fragmentation may happen. To address this problems, in stdio we do a couple of things: 
 
 + To solve the system FFI use case, we add a separated `CBytes` type:
 
@@ -23,7 +23,7 @@ Which always wrap an immutable null-terminated string, It's used as the file pat
 
 + We build a `ByteArray#` based vector type, which based on `PrimArray` in primitive package.
 
-```
+```haskell
 -- from primitive >= 0.6.4.0
 data PrimArray a = PrimArray ByteArray#
 
@@ -66,11 +66,7 @@ instance Vec Vector a where
     toArr (Vector arr s l) = (arr, s, l)
     fromArr = Vector
 
-data PrimVector a = PrimVector
-    {-# UNPACK #-} !(PrimArray a)   -- ^ payload
-    {-# UNPACK #-} !Int             -- ^ offset in elements of type a rather than in bytes
-    {-# UNPACK #-} !Int             -- ^ length in elements of type a rather than in bytes
-
+-- for PrimVector defined above 
 instance Prim a => Vec PrimVector a where
     type MArray PrimVector = MutablePrimArray
     type IArray PrimVector = PrimArray
