@@ -10,9 +10,9 @@ Aeson provide two flavor of parsing entrances: `decode` and `decode'` (and simil
 
 OK, that's my interpretation of those docs for a long time, and i always prefer `decode` to `decode'` since thunking those conversions makes sense to me. But when i started to hack a JSON value parser from ground, suddenly I realized this is far more complex than my first look, a question is begging me to answer:
 
-    How could be this `conversion defering` possible, when parsing should tell us if the JSON is valid? 
+    How could be this `conversion deferring` possible, when parsing should tell us if the JSON is valid? 
 
-There must be something wrong here. After parsing we should have something like `Either String a`, if we defer the conversions, how could we know it's `Right`? If the defered conversion somehow met problems, and we already give a `Right` result, a bottom `undefined` will be produced? No this's just unacceptable, we must do all the conversions before we can be sure the result is `Right`. But what's the point of this lazy vs strict arrangement then?
+There must be something wrong here. After parsing we should have something like `Either String a`, if we defer the conversions, how could we know it's `Right`? If the deferred conversion somehow met problems, and we've already given a `Right` result, a bottom `undefined` will be produced? No this's just unacceptable, we must do all the conversions before we can be sure the result is `Right`. But what's the point of this lazy vs strict arrangement then?
 
 Reading source quickly leads us to the difference before [`json` and `json'`](https://github.com/bos/aeson/blob/master/Data/Aeson/Parser/Internal.hs#L78) parser: i.e. it's the conversions between JSON bytes and `Value`, aeson's intermediate JSON representation, makes this differences. In `json` case,  thunks are produced during parsing. But where're those thunks? What makes things more mysterious is that `Value` use strict field all the way:
 
@@ -55,7 +55,7 @@ arrayValues val = do
     return (Vector.reverse (Vector.fromListN len (v:acc)))
 ```
 
-Since aeson uses accumulator style to build the list, a `reverse` is neccessary, but this monadic `return` is not strict! so we build a thunk to defer the vector building process, but the list of elements is already there, in our memory, built as the parsing loop goes. So yes all parsing work is done, and we don't have to worry about bottoms coming from defered conversions: the only defered conversion here is just a conversion between list of elements to vector of elements, which should never fail.
+Since aeson uses accumulator style to build the list, a `reverse` is neccessary, but this monadic `return` is not strict! so we build a thunk to defer the vector building process, but the list of elements is already there, in our memory, built as the parsing loop goes. So yes all parsing work is done, and we don't have to worry about bottoms coming from deferred conversions: the only deferred conversion here is just a conversion between list of elements to vector of elements, which should never fail.
 
 Similarly in `HashMap` case, we have already parsed all the key-values into a list of key-value pairs. The loop body of the `Object` parser is like this:
 
@@ -70,7 +70,7 @@ Similarly in `HashMap` case, we have already parsed all the key-values into a li
       else return (H.fromList acc')
 ```
 
-Now things are clear, we never miss a thing during parsing, and we only defered two conversions when using aeson's lazy paring. Now the question becomes how does this laziness helped things? Will if we modify [the benchmarks](https://github.com/bos/aeson/blob/master/benchmarks/AesonParse.hs#L30) in aeson's repo, change the `json` parser to a strict `json'`, suddenly performance dropped by ~40%.
+Now things are clear, we never miss a thing during parsing, and we only deferred two conversions when using aeson's lazy paring. Now the question becomes how does this laziness helped things? Well if we modify [the benchmarks](https://github.com/bos/aeson/blob/master/benchmarks/AesonParse.hs#L30) in aeson's repo, change the `json` parser to a strict `json'`, suddenly the performance dropped by ~40%.
 
 ```
 # change to use a strict parser
