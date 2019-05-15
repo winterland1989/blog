@@ -4,7 +4,7 @@ date: 2019/5/16 18:18
 tags: haskell
 ---
 
-Today I'm very happy to announce a new beta version of `stdio` is released on hackage, there're some large additions in this version:
+Today I'm very happy to announce a new beta version of `stdio` is released on [hackage](http://hackage.haskell.org/package/stdio), there're some large additions in this version:
 
 * Add UDP module.
 * Add JSON module.
